@@ -23,7 +23,88 @@ def identify_target_file(target_file):
 
 
 def gen_random_string(length=10):
-    return "".join(random.sample(string.ascii_letters, int(length)))
+    # Real random identifiers repeat characters and mix in digits. The previous
+    # random.sample(ascii_letters, n) produced letters-only, guaranteed-no-repeat
+    # strings -- a NetExec fingerprint (service/output/registry/share names all
+    # flow through here). random.choices over alphanumerics removes both tells
+    # while preserving the length and str return type every caller relies on.
+    return "".join(random.choices(string.ascii_letters + string.digits, k=int(length)))
+
+
+# Realistic, Windows-like artifact names shared with the hardened impacket fork
+# (impacket.examples.artifacts), so NetExec's own exec methods emit the same
+# Windows-shaped service / scheduled-task / temp-file names the fork's example
+# scripts do. Falls back to gen_random_string when run against an impacket that
+# lacks the helper, so nothing breaks on stock impacket.
+try:
+    from impacket.examples import artifacts as _win_artifacts
+except Exception:
+    _win_artifacts = None
+
+
+def gen_service_names():
+    """Return ``(service_name, display_name)`` for a service-based exec method.
+
+    Realistic per-user-service style names (e.g. ``BluetoothUserService_49b2c``)
+    with a distinct display name, defeating the ``^[A-Za-z]{n}$`` /
+    ``display == name`` service tell.
+    """
+    if _win_artifacts is not None:
+        name, display, _ = _win_artifacts.service_artifacts()
+        return name, display
+    return gen_random_string(8), gen_random_string(8)
+
+
+def gen_temp_filename(ext=""):
+    """Return a ``GetTempFileName``-style scratch/output name (e.g. ``tmp8A3F.tmp``)."""
+    if _win_artifacts is not None:
+        return _win_artifacts.temp_filename(ext)
+    return gen_random_string(6) + ext
+
+
+def gen_task_name():
+    """Return a realistic scheduled-task name (e.g. an update-task name + GUID)."""
+    if _win_artifacts is not None:
+        return _win_artifacts.scheduled_task_name()
+    return gen_random_string(8)
+
+
+# Plausible Windows share labels for the transient reverse-output share NetExec
+# hosts locally to catch fileless command output (used by the SMB exec methods).
+# The historic default was gen_random_string(5).upper() -- a fixed ^[A-Z]{5}$
+# token; a realistic randomized label is far less remarkable in the target's
+# outbound SMB. This is a NetExec-native artifact (there is no reverse share in
+# impacket's example scripts), so it lives here rather than in the fork's
+# artifacts helper. Override the default with the NXC_SMB_SHARE_NAME env var.
+_SHARE_LABELS = ("Users", "Public", "Data", "Share", "Files", "Apps",
+                 "Backup", "Media", "Work", "Home", "Docs", "Reports")
+
+
+def gen_share_name():
+    """Return a realistic, randomized SMB share label (e.g. ``Data``, ``Backup$``)."""
+    label = random.choice(_SHARE_LABELS)
+    roll = random.random()
+    if roll < 0.34:
+        return label + "$"                       # hidden share -- very common on Windows
+    if roll < 0.67:
+        return label + str(random.randint(1, 9))
+    return label
+
+
+def gen_registry_path():
+    """Return a realistic ``HKLM\\Software\\Classes`` subkey for transient exec output.
+
+    The WMI reg-out exec method stashes base64 output under a scratch key. A GUID
+    leaf (``Software\\Classes\\{GUID}``) is indistinguishable from a legitimate COM
+    class registration, defeating the bare ``Software\\Classes\\<random>`` tell,
+    while keeping the exact single-level structure the exec method already relies
+    on. Reuses the fork's artifacts.guid() for cross-tool consistency; falls back
+    to a locally-built GUID-shaped key on a stock impacket.
+    """
+    if _win_artifacts is not None:
+        return "Software\\Classes\\" + _win_artifacts.guid()   # guid() already brace-wraps
+    g = "-".join("".join(random.choices("0123456789ABCDEF", k=n)) for n in (8, 4, 4, 4, 12))
+    return "Software\\Classes\\{%s}" % g
 
 
 def validate_ntlm(data):

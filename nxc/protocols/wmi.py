@@ -18,6 +18,62 @@ from impacket.dcerpc.v5.dcom.wmi import CLSID_WbemLevel1Login, IID_IWbemLevel1Lo
 
 MSRPC_UUID_PORTMAP = uuidtup_to_bin(("E1AF8308-5D1F-11C9-91A4-08002B14A0FA", "3.0"))
 
+# Bind-Time-Feature-Negotiation pseudo-syntax, with the two feature bits Windows
+# advertises (SECURITY_CONTEXT_MULTIPLEXING 0x01 | KEEP_CONNECTION_ON_ORPHAN 0x02).
+# Matches the hardened impacket fork's bind() (IoC 37).
+BTFN_TRANSFER_SYNTAX = uuidtup_to_bin(("6CB71C2C-9812-4540-0300-000000000000", "1.0"))
+NDR32_TRANSFER_SYNTAX = uuidtup_to_bin(("8a885d04-1ceb-11c9-9fe8-08002b104860", "2.0"))
+
+
+def build_ntlm_info_bind():
+    """Build the anonymous NTLM-negotiate bind used to read a target's Type-2
+    challenge (host / domain / OS enumeration, a la DumpNTLMInfo).
+
+    Split out of enum_host_info so its Windows-like shape can be unit-tested
+    offline without a socket. Mirrors the hardened impacket fork's bind():
+      * a 2nd BTFN presentation context, not a lone NDR32 context (IoC 37);
+      * a Windows-shaped NTLM negotiate carrying the Windows VERSION (IoC 24/32);
+      * a small auth-context id, not the fixed +79231 (IoC 40);
+      * 0x00-filled auth padding, not 0xFF (IoC 40/49).
+
+    The BTFN context is acknowledged by the server as a feature negotiation and
+    is never selected for marshaling, so the challenge read back from the
+    BindAck auth_data is unchanged.
+    """
+    bind = MSRPCBind()
+    item = CtxItem()
+    item["AbstractSyntax"] = epm.MSRPC_UUID_PORTMAP
+    item["TransferSyntax"] = NDR32_TRANSFER_SYNTAX
+    item["ContextID"] = 0
+    item["TransItems"] = 1
+    bind.addCtxItem(item)
+
+    btfn = CtxItem()
+    btfn["AbstractSyntax"] = epm.MSRPC_UUID_PORTMAP
+    btfn["TransferSyntax"] = BTFN_TRANSFER_SYNTAX
+    btfn["ContextID"] = 1
+    btfn["TransItems"] = 1
+    bind.addCtxItem(btfn)
+
+    packet = MSRPCHeader()
+    packet["type"] = MSRPC_BIND
+    packet["pduData"] = bind.getData()
+    packet["call_id"] = 1
+
+    win_version = ntlm.get_windows_version() if hasattr(ntlm, "get_windows_version") else None
+    auth = ntlm.getNTLMSSPType1("", "", signingRequired=True, use_ntlmv2=True, version=win_version)
+    sec_trailer = SEC_TRAILER()
+    sec_trailer["auth_type"] = RPC_C_AUTHN_WINNT
+    sec_trailer["auth_level"] = RPC_C_AUTHN_LEVEL_PKT_INTEGRITY
+    sec_trailer["auth_ctx_id"] = 1
+    pad = (4 - (len(packet.get_packet()) % 4)) % 4
+    if pad != 0:
+        packet["pduData"] += b"\x00" * pad
+        sec_trailer["auth_pad_len"] = pad
+    packet["sec_trailer"] = sec_trailer
+    packet["auth_data"] = auth
+    return packet
+
 
 class wmi(connection):
     def __init__(self, args, db, host):
@@ -92,31 +148,10 @@ class wmi(connection):
     def enum_host_info(self):
         # All code pick from DumpNTLNInfo.py
         # https://github.com/fortra/impacket/blob/master/examples/DumpNTLMInfo.py
-
-        bind = MSRPCBind()
-        item = CtxItem()
-        item["AbstractSyntax"] = epm.MSRPC_UUID_PORTMAP
-        item["TransferSyntax"] = uuidtup_to_bin(("8a885d04-1ceb-11c9-9fe8-08002b104860", "2.0"))
-        item["ContextID"] = 0
-        item["TransItems"] = 1
-        bind.addCtxItem(item)
-
-        packet = MSRPCHeader()
-        packet["type"] = MSRPC_BIND
-        packet["pduData"] = bind.getData()
-        packet["call_id"] = 1
-
-        auth = ntlm.getNTLMSSPType1("", "", signingRequired=True, use_ntlmv2=True)
-        sec_trailer = SEC_TRAILER()
-        sec_trailer["auth_type"] = RPC_C_AUTHN_WINNT
-        sec_trailer["auth_level"] = RPC_C_AUTHN_LEVEL_PKT_INTEGRITY
-        sec_trailer["auth_ctx_id"] = 0 + 79231
-        pad = (4 - (len(packet.get_packet()) % 4)) % 4
-        if pad != 0:
-            packet["pduData"] += b"\xFF" * pad
-            sec_trailer["auth_pad_len"] = pad
-        packet["sec_trailer"] = sec_trailer
-        packet["auth_data"] = auth
+        # The bind is built by build_ntlm_info_bind() so its Windows-like shape
+        # (BTFN 2nd context, small auth-context id, 0x00 pad, Windows NTLM version)
+        # can be regression-tested offline.
+        packet = build_ntlm_info_bind()
 
         try:
             self.conn.connect()

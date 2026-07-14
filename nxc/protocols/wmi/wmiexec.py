@@ -16,7 +16,7 @@
 import time
 import uuid
 import base64
-from nxc.helpers.misc import gen_random_string
+from nxc.helpers.misc import gen_registry_path
 from impacket.dcerpc.v5.dtypes import NULL
 
 
@@ -64,7 +64,7 @@ class WMIEXEC:
         result_output = f"C:\\windows\\temp\\{uuid.uuid4()!s}.txt"
         result_output_b64 = f"C:\\windows\\temp\\{uuid.uuid4()!s}.txt"
         keyName = str(uuid.uuid4())
-        self.__registry_Path = f"Software\\Classes\\{gen_random_string(8)}"
+        self.__registry_Path = gen_registry_path()
 
         # 1. Run the command and write output to file
         self.execute_remote(f'{self.__shell} ({command}) 1> "{result_output}" 2>&1')
@@ -105,7 +105,7 @@ class WMIEXEC:
         result_output = f"C:\\windows\\temp\\{uuid.uuid4()!s}.txt"
         result_output_b64 = f"C:\\windows\\temp\\{uuid.uuid4()!s}.txt"
         keyName = str(uuid.uuid4())
-        self.__registry_Path = f"Software\\Classes\\{gen_random_string(8)}"
+        self.__registry_Path = gen_registry_path()
 
         # 1. Run the command and write output to file
         if not command.lower().startswith("powershell"):

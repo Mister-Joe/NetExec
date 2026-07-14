@@ -2,7 +2,7 @@ import os
 from os.path import join as path_join
 from time import sleep
 from impacket.dcerpc.v5 import scmr
-from nxc.helpers.misc import gen_random_string
+from nxc.helpers.misc import gen_service_names, gen_temp_filename
 from nxc.paths import TMP_PATH
 from nxc.helpers.rpc import NXCRPCConnection
 
@@ -14,7 +14,7 @@ class SMBEXEC:
         self.logger = logger
         self.__tries = tries
 
-        self.__serviceName = gen_random_string()
+        self.__serviceName, self.__serviceDisplayName = gen_service_names()
         self.__output = None
         self.__batchFile = None
         self.__outputBuffer = b""
@@ -47,8 +47,8 @@ class SMBEXEC:
         self.__outputBuffer += data
 
     def execute_remote(self, data):
-        self.__output = gen_random_string(6)
-        self.__batchFile = gen_random_string(6) + ".bat"
+        self.__output = gen_temp_filename(".tmp")
+        self.__batchFile = gen_temp_filename(".bat")
 
         command = self.__shell + "echo " + data + f" ^> \\\\%COMPUTERNAME%\\{self.__share}\\{self.__output} 2^>^&1 > %TEMP%\\{self.__batchFile} & %COMSPEC% /Q /c %TEMP%\\{self.__batchFile} & %COMSPEC% /Q /c del %TEMP%\\{self.__batchFile}" if self.__retOutput else self.__shell + data
 
@@ -64,7 +64,7 @@ class SMBEXEC:
                 self.__scmr,
                 self.__scHandle,
                 self.__serviceName,
-                self.__serviceName,
+                self.__serviceDisplayName,
                 lpBinaryPathName=command,
                 dwStartType=scmr.SERVICE_DEMAND_START,
             )

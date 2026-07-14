@@ -6,7 +6,7 @@ from termcolor import colored
 from nxc.config import process_secret, host_info_colors
 from nxc.connection import connection
 from nxc.connection import requires_admin
-from nxc.helpers.misc import gen_random_string
+from nxc.helpers.misc import gen_temp_filename
 from nxc.logger import NXCAdapter
 from nxc.helpers.bloodhound import add_user_bh
 from nxc.helpers.negotiate_parser import parse_challenge, login7_integrated_auth_error_message
@@ -557,8 +557,8 @@ class mssql(connection):
 
     @requires_admin
     def sam(self):
-        sam_storename = gen_random_string(6)
-        system_storename = gen_random_string(6)
+        sam_storename = gen_temp_filename()
+        system_storename = gen_temp_filename()
         dump_command = f"reg save HKLM\\SAM C:\\windows\\temp\\{sam_storename} && reg save HKLM\\SYSTEM C:\\windows\\temp\\{system_storename}"
         clean_command = f"del C:\\windows\\temp\\{sam_storename} && del C:\\windows\\temp\\{system_storename}"
         get_owner_command = f"icacls C:\\windows\\temp\\{sam_storename} /grant {self.username}:F && icacls C:\\windows\\temp\\{system_storename} /grant {self.username}:F"
@@ -592,8 +592,8 @@ class mssql(connection):
 
     @requires_admin
     def lsa(self):
-        security_storename = gen_random_string(6)
-        system_storename = gen_random_string(6)
+        security_storename = gen_temp_filename()
+        system_storename = gen_temp_filename()
         dump_command = f"reg save HKLM\\SECURITY C:\\windows\\temp\\{security_storename} && reg save HKLM\\SYSTEM C:\\windows\\temp\\{system_storename}"
         clean_command = f"del C:\\windows\\temp\\{security_storename} && del C:\\windows\\temp\\{system_storename}"
         get_owner_command = f"icacls C:\\windows\\temp\\{security_storename} /grant {self.username}:F && icacls C:\\windows\\temp\\{system_storename} /grant {self.username}:F"

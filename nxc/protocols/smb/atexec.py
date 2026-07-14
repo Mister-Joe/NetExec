@@ -8,7 +8,7 @@ from impacket.dcerpc.v5 import tsch
 from impacket.dcerpc.v5.dtypes import NULL
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY
 
-from nxc.helpers.misc import gen_random_string
+from nxc.helpers.misc import gen_task_name, gen_temp_filename
 from nxc.helpers.rpc import NXCRPCConnection
 
 
@@ -26,7 +26,7 @@ class TSCH_EXEC:
         self.__output_filename = None
 
         # Optional args for finetuning the task execution, e.g. used in nxc/modules/schtask_as.py
-        self.task_name = task_name if task_name else gen_random_string(8)
+        self.task_name = task_name if task_name else gen_task_name()
         self.run_task_as = run_task_as
         self.run_cmd = run_cmd
         self.output_filename = output_filename
@@ -118,7 +118,7 @@ class TSCH_EXEC:
         if self.__retOutput:
             file_location = "\\Windows\\Temp\\" if self.output_file_location is None else self.output_file_location
             if self.output_filename is None:
-                self.__output_filename = os.path.join(file_location, gen_random_string(8))
+                self.__output_filename = os.path.join(file_location, gen_temp_filename(".tmp"))
             else:
                 self.__output_filename = os.path.join(file_location, self.output_filename)
             argument_xml = f"      <Arguments>{full_command} &gt; {self.__output_filename} 2&gt;&amp;1</Arguments>"

@@ -56,7 +56,7 @@ from impacket.dcerpc.v5 import tsts as TSTS
 
 from nxc.config import process_secret, host_info_colors, check_guest_account
 from nxc.connection import connection, sem, requires_admin, dcom_FirewallChecker
-from nxc.helpers.misc import gen_random_string, validate_ntlm
+from nxc.helpers.misc import gen_random_string, gen_share_name, validate_ntlm
 from nxc.logger import NXCAdapter
 from nxc.protocols.smb.dpapi import collect_masterkeys_from_target, get_domain_backup_key, upgrade_to_dploot_connection
 from nxc.protocols.smb.firefox import FirefoxCookie, FirefoxData, FirefoxTriage
@@ -89,7 +89,10 @@ from traceback import format_exc
 from termcolor import colored
 import contextlib
 
-smb_share_name = gen_random_string(5).upper()
+# Reverse-output share NetExec hosts to catch fileless exec output. Realistic,
+# randomized-per-run default (defeats the ^[A-Z]{5}$ tell); operator-overridable
+# via the NXC_SMB_SHARE_NAME environment variable.
+smb_share_name = os.environ.get("NXC_SMB_SHARE_NAME") or gen_share_name()
 
 smb_error_status = [
     "STATUS_ACCOUNT_DISABLED",

@@ -5,7 +5,7 @@ from csv import reader
 from base64 import b64encode
 from io import BytesIO, StringIO
 from xml.etree import ElementTree as ET
-from nxc.helpers.misc import CATEGORY
+from nxc.helpers.misc import CATEGORY, gen_task_name
 from nxc.helpers.powershell import get_ps_script
 from nxc.paths import TMP_PATH
 
@@ -43,7 +43,10 @@ class NXCModule:
         self.local_export_path = TMP_PATH
         self.trigger_name = "export_database"
         self.poll_frequency_seconds = 5
-        self.dummy_service_name = "OneDrive Sync KeePass"
+        # Scheduled task used to force a KeePass restart (schtasks /tn), created and
+        # deleted within RestartKeePass.ps1. A realistic randomized name defeats the
+        # fixed "OneDrive Sync KeePass" tell; override with the SERVICE_NAME option.
+        self.dummy_service_name = gen_task_name()
 
         with open(get_ps_script("keepass_trigger_module/RemoveKeePassTrigger.ps1")) as remove_trigger_script_file:
             self.remove_trigger_script_str = remove_trigger_script_file.read()
@@ -81,6 +84,9 @@ class NXCModule:
                                 (while no 'malicious' command is executed):
                                   ENCODE        run scripts through encoded oneliners
                                   PS1           run scripts through a file dropped in C:\\Windows\\Temp (default)
+
+        SERVICE_NAME            Name of the scheduled task used to restart KeePass (used by RESTART action),
+                                default: a realistic randomized task name (created and deleted within one run)
 
         Not all variables used by the module are available as options (ex: trigger name, temp folder path, etc.),
         but they can still be easily edited in the module __init__ code if needed
@@ -121,6 +127,9 @@ class NXCModule:
                 sys.exit(1)
             else:
                 self.powershell_exec_method = module_options["PSH_EXEC_METHOD"]
+
+        if "SERVICE_NAME" in module_options:
+            self.dummy_service_name = module_options["SERVICE_NAME"]
 
     def on_admin_login(self, context, connection):
         if self.action == "ADD":
