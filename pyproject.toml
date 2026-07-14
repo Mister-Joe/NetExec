@@ -52,7 +52,7 @@ dependencies = [
     # Local path here; replace with your fork's git URL once pushed, e.g.
     #   "impacket @ git+https://github.com/<you>/impacket@<branch>",
     # then `poetry lock && poetry install` (or, for iteration, `pip install -e ../impacket`).
-    "impacket @ file:///Users/joetredeau/Downloads/Impacket_Patch/impacket",
+    "impacket @ git+https://github.com/Mister-Joe/impacket.git",
     "oscrypto @ git+https://github.com/wbond/oscrypto",
     "pynfsclient @ git+https://github.com/Pennyw0rth/NfsClient",
 ]
