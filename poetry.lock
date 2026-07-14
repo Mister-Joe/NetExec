@@ -1146,7 +1146,7 @@ six = "*"
 
 [package.source]
 type = "git"
-url = "https://github.com/fortra/impacket"
+url = "https://github.com/Mister-Joe/impacket"
 reference = "HEAD"
 resolved_reference = "153e8ddb1ec3cda489443392cabf97c8c631a4e5"
 
